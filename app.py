@@ -1,114 +1,91 @@
 import streamlit as st
+import pandas as pd
 import requests
+import xml.etree.ElementTree as ET
 
 st.set_page_config(
-    page_title="News Dashboard",
+    page_title="Advanced News Dashboard",
     page_icon="📰",
     layout="wide"
 )
 
-st.title("📰 News Dashboard")
+st.title("📰 Advanced News Dashboard")
+st.markdown("Latest News Headlines")
 
-# API KEY
-API_KEY = st.secrets["NEWS_API_KEY"]
-
-BASE_URL = "https://newsapi.org/v2/top-headlines"
-
-# Sidebar
-st.sidebar.header("Filters")
-
-country_map = {
-    "India": "in",
-    "USA": "us",
-    "UK": "gb",
-    "Australia": "au"
+rss_feeds = {
+    "World": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "Business": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+    "Technology": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+    "Sports": "https://rss.nytimes.com/services/xml/rss/nyt/Sports.xml"
 }
 
-country_name = st.sidebar.selectbox(
-    "Country",
-    list(country_map.keys())
-)
+st.sidebar.header("Filters")
 
 category = st.sidebar.selectbox(
     "Category",
-    [
-        "business",
-        "entertainment",
-        "general",
-        "health",
-        "science",
-        "sports",
-        "technology"
-    ]
+    list(rss_feeds.keys())
 )
 
-keyword = st.sidebar.text_input("Search Keyword")
+keyword = st.sidebar.text_input(
+    "Search Keyword"
+)
 
-articles_count = st.sidebar.slider(
+num_articles = st.sidebar.slider(
     "Number of Articles",
-    1,
-    20,
+    5,
+    30,
     10
 )
 
 if st.sidebar.button("Fetch News"):
 
-    params = {
-        "apiKey": API_KEY,
-        "country": country_map[country_name],
-        "category": category,
-        "pageSize": articles_count
-    }
-
     try:
+        response = requests.get(rss_feeds[category])
 
-        response = requests.get(BASE_URL, params=params)
+        root = ET.fromstring(response.content)
 
-        st.subheader("Debug Information")
+        articles = []
 
-        st.write("Status Code:", response.status_code)
+        for item in root.findall(".//item"):
 
-        data = response.json()
+            title = item.find("title").text if item.find("title") is not None else ""
 
-        st.write(data)
+            link = item.find("link").text if item.find("link") is not None else ""
 
-        if response.status_code != 200:
-            st.error("API Error")
-            st.stop()
+            description = (
+                item.find("description").text
+                if item.find("description") is not None
+                else ""
+            )
 
-        articles = data.get("articles", [])
+            articles.append({
+                "title": title,
+                "description": description,
+                "link": link
+            })
 
         if keyword:
             articles = [
-                article for article in articles
-                if keyword.lower()
-                in (
-                    str(article.get("title", "")) +
-                    str(article.get("description", ""))
+                a for a in articles
+                if keyword.lower() in (
+                    a["title"] + a["description"]
                 ).lower()
             ]
+
+        articles = articles[:num_articles]
 
         st.success(f"{len(articles)} Articles Found")
 
         for article in articles:
 
-            st.subheader(article.get("title", "No Title"))
+            st.subheader(article["title"])
 
-            if article.get("urlToImage"):
-                st.image(article["urlToImage"])
+            st.write(article["description"])
 
-            st.write(
-                article.get(
-                    "description",
-                    "No description available"
-                )
+            st.link_button(
+                "Read Full Article",
+                article["link"]
             )
-
-            if article.get("url"):
-                st.link_button(
-                    "Read Full Article",
-                    article["url"]
-                )
 
             st.divider()
 
