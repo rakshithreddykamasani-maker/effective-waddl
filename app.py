@@ -65,6 +65,8 @@ if st.sidebar.button("Fetch News"):
     }
 
     response = requests.get(BASE_URL, params=params)
+    st.write("Status Code:", response.status_code)
+st.write(response.json())
 
     if response.status_code == 200:
 
