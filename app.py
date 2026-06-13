@@ -1,10 +1,6 @@
 import streamlit as st
 import requests
 
-# API Configuration
-API_KEY = st.secrets["NEWS_API_KEY"]
-BASE_URL = "https://newsapi.org/v2/top-headlines"
-
 st.set_page_config(
     page_title="News Dashboard",
     page_icon="📰",
@@ -13,17 +9,24 @@ st.set_page_config(
 
 st.title("📰 News Dashboard")
 
-# Sidebar Filters
+# API KEY
+API_KEY = st.secrets["NEWS_API_KEY"]
+
+BASE_URL = "https://newsapi.org/v2/top-headlines"
+
+# Sidebar
 st.sidebar.header("Filters")
 
-country = st.sidebar.selectbox(
+country_map = {
+    "India": "in",
+    "USA": "us",
+    "UK": "gb",
+    "Australia": "au"
+}
+
+country_name = st.sidebar.selectbox(
     "Country",
-    {
-        "India": "in",
-        "USA": "us",
-        "UK": "gb",
-        "Australia": "au"
-    }
+    list(country_map.keys())
 )
 
 category = st.sidebar.selectbox(
@@ -39,13 +42,11 @@ category = st.sidebar.selectbox(
     ]
 )
 
-keyword = st.sidebar.text_input(
-    "Search Keyword"
-)
+keyword = st.sidebar.text_input("Search Keyword")
 
-num_articles = st.sidebar.slider(
+articles_count = st.sidebar.slider(
     "Number of Articles",
-    5,
+    1,
     20,
     10
 )
@@ -54,31 +55,34 @@ if st.sidebar.button("Fetch News"):
 
     params = {
         "apiKey": API_KEY,
-        "country": {
-            "India": "in",
-            "USA": "us",
-            "UK": "gb",
-            "Australia": "au"
-        }[country],
+        "country": country_map[country_name],
         "category": category,
-        "pageSize": num_articles
+        "pageSize": articles_count
     }
 
-    response = requests.get(BASE_URL, params=params)
-    st.write("Status Code:", response.status_code)
-st.write(response.json())
+    try:
 
-    if response.status_code == 200:
+        response = requests.get(BASE_URL, params=params)
+
+        st.subheader("Debug Information")
+
+        st.write("Status Code:", response.status_code)
 
         data = response.json()
+
+        st.write(data)
+
+        if response.status_code != 200:
+            st.error("API Error")
+            st.stop()
 
         articles = data.get("articles", [])
 
         if keyword:
             articles = [
-                article
-                for article in articles
-                if keyword.lower() in (
+                article for article in articles
+                if keyword.lower()
+                in (
                     str(article.get("title", "")) +
                     str(article.get("description", ""))
                 ).lower()
@@ -88,19 +92,25 @@ st.write(response.json())
 
         for article in articles:
 
-            st.subheader(article["title"])
+            st.subheader(article.get("title", "No Title"))
 
             if article.get("urlToImage"):
                 st.image(article["urlToImage"])
 
-            st.write(article.get("description"))
-
-            st.link_button(
-                "Read More",
-                article["url"]
+            st.write(
+                article.get(
+                    "description",
+                    "No description available"
+                )
             )
+
+            if article.get("url"):
+                st.link_button(
+                    "Read Full Article",
+                    article["url"]
+                )
 
             st.divider()
 
-    else:
-        st.error("Failed to fetch news")
+    except Exception as e:
+        st.error(str(e))
