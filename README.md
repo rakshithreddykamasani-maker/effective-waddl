@@ -1,2 +1,2 @@
-# effective-waddl
+# mahindra-carpool
 day 2 
